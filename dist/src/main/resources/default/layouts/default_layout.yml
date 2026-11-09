@@ -40,7 +40,7 @@ default_layout:
   texts:
     1:
       text: default_text
-      pattern: "[entity_name]"
+      pattern: "[entity_name] [health]//[max_health]"
       align: center
       x: 60
       y: 20

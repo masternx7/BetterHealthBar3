@@ -274,7 +274,8 @@ public class PlaceholderContainer<T> {
         var array = new ArrayList<Function<HealthBarCreateEvent, Component>>();
         var sb = new StringBuilder();
         var skip = false;
-        for (char c : pattern.toCharArray()) {
+        for (int i = 0; i < pattern.length(); i++) {
+            var c = pattern.charAt(i);
             if (!skip) switch (c) {
                 case '[' -> {
                     var string = legacyAdapt(sb.toString());
@@ -291,8 +292,16 @@ public class PlaceholderContainer<T> {
                     sb.setLength(0);
                 }
                 case '\\' -> skip = true;
+                case '/' -> {
+                    // "//" is an escaped slash, same as BetterHud.
+                    sb.append('/');
+                    if (i + 1 < pattern.length() && pattern.charAt(i + 1) == '/') i++;
+                }
                 default -> sb.append(c);
-            } else sb.append(c);
+            } else {
+                skip = false;
+                sb.append(c);
+            }
         }
         if (!sb.isEmpty()) {
             var string = Component.text(sb.toString());
