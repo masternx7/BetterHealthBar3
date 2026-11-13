@@ -68,7 +68,7 @@ class TextLayoutImpl(
 
     fun build(resource: PackResource, count: Int) {
         val dataList = ArrayList<JsonData>()
-        val fileParent = "${parent.name}/text/${layer()}"
+        val fileParent = "${parent.name}/text/$name/${layer()}"
         text.bitmap().forEachIndexed { index, textBitmap ->
             val fileName = "${encodeKey(EncodeManager.EncodeNamespace.TEXTURES, "$fileParent/${index + 1}")}.png"
             dataList.add(JsonData(

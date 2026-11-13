@@ -25,6 +25,14 @@ object TextManagerImpl : TextManager, BetterHealthBerManager {
     private val frc = FontRenderContext(null, true, true)
     private const val SPLIT_SIZE = 16
 
+    private val fallbackFont: Font? by lazy {
+        PLUGIN.getResource("default/fonts/default_font.ttf")?.use { stream ->
+            runCatching {
+                Font.createFont(Font.TRUETYPE_FONT, stream)
+            }.getOrNull()
+        }
+    }
+
     private lateinit var default: HealthBarTextImpl
     private val textMap = ConcurrentHashMap<String, HealthBarTextImpl>()
 
@@ -111,16 +119,29 @@ object TextManagerImpl : TextManager, BetterHealthBerManager {
 
         val height = (font.size.toDouble() * 1.4).roundToInt()
 
+        fun drawGlyph(target: Font, codePoint: Int): BufferedImage? {
+            return BufferedImage(target.size, height, BufferedImage.TYPE_INT_ARGB).apply {
+                createGraphics().run {
+                    fill(target.createGlyphVector(frc, codePoint.parseChar()).getOutline(0F, target.size.toFloat()))
+                    dispose()
+                }
+            }.removeEmptyWidth()?.image
+        }
+
         (0..0x10FFFF).filter {
             font.canDisplay(it)
         }.forEachAsync {
-            BufferedImage(font.size, height, BufferedImage.TYPE_INT_ARGB).apply {
-                createGraphics().run {
-                    fill(font.createGlyphVector(frc, it.parseChar()).getOutline(0F, font.size.toFloat()))
-                    dispose()
+            drawGlyph(font, it)?.let { image ->
+                register(it, image)
+            }
+        }
+
+        // Use the bundled default font as a fallback for characters missing from a custom font.
+        fallbackFont?.deriveFont(font.size)?.let { fallback ->
+            (0x20..0x7E).filter { charWidth[it] == null && fallback.canDisplay(it) }.forEach { codePoint ->
+                drawGlyph(fallback, codePoint)?.let { image ->
+                    register(codePoint, image)
                 }
-            }.removeEmptyWidth()?.let { image ->
-                register(it, image.image)
             }
         }
 

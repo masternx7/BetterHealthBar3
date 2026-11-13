@@ -1,7 +1,5 @@
 package kr.toxicity.healthbar.nms.v26_R3
 
-import ca.spottedleaf.concurrentutil.map.concurrent.longs.ConcurrentChainedLong2ReferenceHashTable
-import ca.spottedleaf.moonrise.patches.chunk_system.level.entity.EntityLookup
 import com.mojang.math.Transformation
 import io.netty.channel.ChannelDuplexHandler
 import io.netty.channel.ChannelHandlerContext
@@ -32,7 +30,6 @@ import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.PositionPath
 import net.minecraft.world.level.entity.LevelEntityGetter
-import net.minecraft.world.level.entity.LevelEntityGetterAdapter
 import net.minecraft.world.level.entity.PersistentEntitySectionManager
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
@@ -63,19 +60,13 @@ class NMSImpl : NMS {
     private val plugin
         get() = BetterHealthBar.inst()
 
-    private val getConnection: (ServerCommonPacketListenerImpl) -> Connection = if (plugin.isPaper) {
-        {
-            it.connection
-        }
-    } else {
-        ServerCommonPacketListenerImpl::class.java.declaredFields.first { f ->
-            f.type == Connection::class.java
-        }.apply {
-            isAccessible = true
-        }.let { get ->
-            {
-                get[it] as Connection
-            }
+    private val getConnection: (ServerCommonPacketListenerImpl) -> Connection = run {
+        val field = (ServerCommonPacketListenerImpl::class.java.declaredFields.asSequence() + ServerCommonPacketListenerImpl::class.java.fields.asSequence())
+            .firstOrNull { it.type == Connection::class.java }
+            ?: throw RuntimeException("Unable to find connection field.")
+        field.isAccessible = true
+        { listener ->
+            field[listener] as Connection
         }
     }
     private val entityTracker = ServerLevel::class.java.fields.firstOrNull {
@@ -83,29 +74,14 @@ class NMSImpl : NMS {
     }?.apply { 
         isAccessible = true
     }
-
-    private val getEntityById: (LevelEntityGetter<net.minecraft.world.entity.Entity>, Int) -> net.minecraft.world.entity.Entity? = if (plugin.isPaper) EntityLookup::class.java.declaredFields.first {
-        ConcurrentChainedLong2ReferenceHashTable::class.java.isAssignableFrom(it.type)
-    }.let {
-        it.isAccessible = true
-        { e, i ->
-            (it[e] as ConcurrentChainedLong2ReferenceHashTable<*>)[i.toLong()] as? net.minecraft.world.entity.Entity
-        }
-    } else LevelEntityGetterAdapter::class.java.declaredFields.first {
-        net.minecraft.world.level.entity.EntityLookup::class.java.isAssignableFrom(it.type)
-    }.let {
-        it.isAccessible = true
-        { e, i ->
-            (it[e] as net.minecraft.world.level.entity.EntityLookup<*>).getEntity(i) as? net.minecraft.world.entity.Entity
-        }
+    private val entityLookupField = net.minecraft.world.level.Level::class.java.declaredFields.firstOrNull {
+        it.type.name == "ca.spottedleaf.moonrise.patches.chunk_system.level.entity.EntityLookup"
+    }?.apply {
+        isAccessible = true
     }
-    private val getEntityFromMovePacket: (ClientboundMoveEntityPacket) -> Int = ClientboundMoveEntityPacket::class.java.declaredFields.first {
-        Integer.TYPE.isAssignableFrom(it.type)
-    }.let {
-        it.isAccessible = true
-        { p ->
-            it[p] as Int
-        }
+
+    private val getEntityById: (LevelEntityGetter<net.minecraft.world.entity.Entity>, Int) -> net.minecraft.world.entity.Entity? = { getter, id ->
+        getter.get(id)
     }
     private val textVanilla: (Component) -> net.minecraft.network.chat.Component = if (plugin.isPaper) {
         {
@@ -424,12 +400,14 @@ class NMSImpl : NMS {
 
         @Suppress("UNCHECKED_CAST")
         private fun getLevelGetter(): LevelEntityGetter<net.minecraft.world.entity.Entity> {
-            return if (plugin.isPaper) {
+            return runCatching {
                 serverPlayer.level().`moonrise$getEntityLookup`()
-            } else {
-                entityTracker?.get(serverPlayer.level())?.let {
-                    (it as PersistentEntitySectionManager<*>).entityGetter as LevelEntityGetter<net.minecraft.world.entity.Entity>
-                } ?: throw RuntimeException("LevelEntityGetter")
+            }.getOrElse {
+                entityLookupField?.get(serverPlayer.level()) as? LevelEntityGetter<net.minecraft.world.entity.Entity>
+                    ?: entityTracker?.get(serverPlayer.level())?.let { manager ->
+                        (manager as PersistentEntitySectionManager<*>).entityGetter as LevelEntityGetter<net.minecraft.world.entity.Entity>
+                    }
+                    ?: throw RuntimeException("LevelEntityGetter")
             }
         }
 
@@ -438,7 +416,7 @@ class NMSImpl : NMS {
         override fun write(ctx: ChannelHandlerContext?, msg: Any?, promise: ChannelPromise?) {
             when (msg) {
                 is ClientboundDamageEventPacket -> show(msg, HealthBarTriggerType.DAMAGE, msg.entityId.toEntity())
-                is ClientboundMoveEntityPacket -> show(msg, HealthBarTriggerType.MOVE, getEntityFromMovePacket(msg).toEntity())
+                is ClientboundMoveEntityPacket -> show(msg, HealthBarTriggerType.MOVE, msg.getEntity(serverPlayer.level()))
             }
             super.write(ctx, msg, promise)
         }
