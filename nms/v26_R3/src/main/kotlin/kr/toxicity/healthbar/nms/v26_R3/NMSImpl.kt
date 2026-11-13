@@ -83,6 +83,16 @@ class NMSImpl : NMS {
     private val getEntityById: (LevelEntityGetter<net.minecraft.world.entity.Entity>, Int) -> net.minecraft.world.entity.Entity? = { getter, id ->
         getter.get(id)
     }
+    private val getEntityFromMovePacket: (ClientboundMoveEntityPacket) -> Int = run {
+        val fields = ClientboundMoveEntityPacket::class.java.declaredFields
+        val field = fields.firstOrNull { it.name == "entityId" && it.type == Integer.TYPE }
+            ?: fields.firstOrNull { it.type == Integer.TYPE }
+            ?: throw RuntimeException("Unable to find entityId field.")
+        field.isAccessible = true
+        { packet ->
+            field[packet] as Int
+        }
+    }
     private val textVanilla: (Component) -> net.minecraft.network.chat.Component = if (plugin.isPaper) {
         {
             PaperAdventure.asVanilla(it)
@@ -416,7 +426,7 @@ class NMSImpl : NMS {
         override fun write(ctx: ChannelHandlerContext?, msg: Any?, promise: ChannelPromise?) {
             when (msg) {
                 is ClientboundDamageEventPacket -> show(msg, HealthBarTriggerType.DAMAGE, msg.entityId.toEntity())
-                is ClientboundMoveEntityPacket -> show(msg, HealthBarTriggerType.MOVE, msg.getEntity(serverPlayer.level()))
+                is ClientboundMoveEntityPacket -> show(msg, HealthBarTriggerType.MOVE, getEntityFromMovePacket(msg).toEntity())
             }
             super.write(ctx, msg, promise)
         }
