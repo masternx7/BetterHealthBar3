@@ -1,5 +1,7 @@
+# Vanilla mobs can be added by entity type name (e.g. ZOMBIE).
 AngrySludge:
   types: []
   healthbars: []
   height: 0
   blacklist: true
+  worlds: []

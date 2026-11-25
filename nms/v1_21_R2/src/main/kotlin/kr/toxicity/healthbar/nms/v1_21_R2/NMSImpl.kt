@@ -365,16 +365,18 @@ class NMSImpl : NMS {
                 val adapt = plugin.mobManager().entity(
                     if (bukkit is Player) injectionMap[bukkit.uniqueId]?.foliaAdapted ?: return@task else foliaAdapt(bukkit)
                 )
-                val types = adapt.mob()?.configuration()?.types()
+                val mob = adapt.mob()
+                val configuration = mob?.configuration()
+                val types = configuration?.types()
                 val packet = PacketTrigger(trigger, handle)
                 set.filter {
-                    (adapt.mob()?.configuration()?.ignoreDefault() != true && it.isDefault) || (types != null && it.applicableTypes().any { t ->
+                    (((bukkit is Player && configuration == null) || configuration?.ignoreDefault() == false) && it.isDefault) || (types != null && it.applicableTypes().any { t ->
                         types.contains(t)
                     })
                 }.forEach {
                     player.showHealthBar(it, packet, adapt)
                 }
-                adapt.mob()?.configuration()?.healthBars()?.forEach {
+                configuration?.healthBars()?.forEach {
                     player.showHealthBar(it, packet, adapt)
                 }
             }

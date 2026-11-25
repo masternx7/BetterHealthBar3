@@ -55,7 +55,10 @@ class HealthBarPlayerImpl(
     override fun showHealthBar(healthBar: HealthBar, trigger: HealthBarTrigger, entity: HealthBarEntity) {
         if (ConfigManagerImpl.blacklistEntityType().contains(entity.entity().type)) return
         entity.mob()?.let {
-            if (it.configuration().blacklist()) return
+            val configuration = it.configuration()
+            if (configuration.blacklist()) return
+            val worlds = configuration.worlds()
+            if (worlds.isNotEmpty() && entity.entity().world.name !in worlds) return
         }
         val data = HealthBarCreateEvent(
             healthBar,

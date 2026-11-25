@@ -10,7 +10,8 @@ class MobConfigurationImpl(
     private val path: String,
     section: ConfigurationSection
 ): MobConfiguration {
-    private val types = section.getStringList("type").toSet()
+    private val types = (section.getStringList("types") + section.getStringList("type")).toSet()
+    private val worlds = section.getStringList("worlds").toSet()
     private val height = section.getDouble("height")
     private val blacklist = section.getBoolean("blacklist")
     private val ignoreDefault = section.getBoolean("ignore-default")
@@ -19,6 +20,7 @@ class MobConfigurationImpl(
     }.toSet()
 
     override fun types(): Set<String> = types
+    override fun worlds(): Set<String> = worlds
     override fun path(): String = path
     override fun height(): Double = height
     override fun blacklist(): Boolean = blacklist

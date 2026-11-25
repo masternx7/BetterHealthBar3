@@ -11,6 +11,9 @@ public interface MobConfiguration extends HealthBarConfiguration {
     @NotNull
     @Unmodifiable
     Set<String> types();
+    @NotNull
+    @Unmodifiable
+    Set<String> worlds();
     double height();
     boolean blacklist();
     boolean ignoreDefault();

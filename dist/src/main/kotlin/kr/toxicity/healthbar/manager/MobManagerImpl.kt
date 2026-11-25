@@ -7,6 +7,7 @@ import kr.toxicity.healthbar.api.mob.MobConfiguration
 import kr.toxicity.healthbar.api.mob.MobProvider
 import kr.toxicity.healthbar.entity.HealthBarEntityImpl
 import kr.toxicity.healthbar.mob.MobConfigurationImpl
+import kr.toxicity.healthbar.mob.VanillaMobProvider
 import kr.toxicity.healthbar.pack.PackResource
 import kr.toxicity.healthbar.util.forEachAllYaml
 import kr.toxicity.healthbar.util.putSync
@@ -21,6 +22,7 @@ object MobManagerImpl : BetterHealthBerManager, MobManager {
     private val mobConfigurationMap = ConcurrentHashMap<String, MobConfiguration>()
 
     override fun start() {
+        addProvider(VanillaMobProvider())
     }
 
     override fun reload(resource: PackResource) {
@@ -39,7 +41,8 @@ object MobManagerImpl : BetterHealthBerManager, MobManager {
         mobProviders.add(provider)
     }
 
-    override fun configuration(name: String): MobConfiguration? = mobConfigurationMap[name]
+    override fun configuration(name: String): MobConfiguration? =
+        mobConfigurationMap[name] ?: mobConfigurationMap.entries.firstOrNull { it.key.equals(name, true) }?.value
     override fun entity(livingEntity: LivingEntity): HealthBarEntity = HealthBarEntityImpl(livingEntity)
 
     override fun provide(entity: LivingEntity): HealthBarMob? = mobProviders.firstNotNullOfOrNull {
